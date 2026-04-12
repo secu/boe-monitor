@@ -1,0 +1,39 @@
+name: BOE Monitor — Subastas Inmuebles
+
+on:
+  schedule:
+    # Hora España CEST (UTC+2): 08:00, 14:00, 22:00
+    - cron: '0 6 * * *'   # 08:00 CEST
+    - cron: '0 12 * * *'  # 14:00 CEST
+    - cron: '0 20 * * *'  # 22:00 CEST
+  workflow_dispatch:        # Permite lanzarlo manualmente desde GitHub
+
+jobs:
+  chequear:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Restaurar estado anterior (estado.json)
+        uses: actions/cache@v4
+        with:
+          path: estado.json
+          key: boe-estado-${{ runner.os }}
+          restore-keys: boe-estado-
+
+      - name: Instalar dependencias Python
+        run: pip install -r requirements.txt
+
+      - name: Ejecutar bot
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python bot.py
+
+      - name: Guardar estado actualizado (estado.json)
+        uses: actions/cache/save@v4
+        with:
+          path: estado.json
+          key: boe-estado-${{ runner.os }}

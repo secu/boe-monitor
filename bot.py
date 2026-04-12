@@ -1,8 +1,9 @@
 """
 BOE Monitor — bot.py
-Chequea 3 veces al día el portal subastas.boe.es y avisa por
-Telegram si ha cambiado el número de subastas de Inmuebles en
-estado "Próxima apertura" (PU) o "Celebrándose" (EJ).
+Comprueba el portal subastas.boe.es y avisa por Telegram si ha
+cambiado el número de subastas de Inmuebles en estado
+"Próxima apertura" (PU) o "Celebrándose" (EJ).
+Diseñado para ejecutarse una vez por invocación (GitHub Actions cron).
 """
 
 import json
@@ -12,7 +13,6 @@ import re
 import time
 
 import requests
-import schedule
 from bs4 import BeautifulSoup
 
 # En Render se usan variables de entorno; en local se usa config.py
@@ -21,11 +21,9 @@ try:
     import config as _cfg
     _FALLBACK_TOKEN   = getattr(_cfg, "TELEGRAM_TOKEN", "")
     _FALLBACK_CHAT_ID = getattr(_cfg, "TELEGRAM_CHAT_ID", "")
-    HORAS_CHEQUEO     = getattr(_cfg, "HORAS_CHEQUEO", ["06:00", "12:00", "20:00"])
 except ImportError:
     _FALLBACK_TOKEN   = ""
     _FALLBACK_CHAT_ID = ""
-    HORAS_CHEQUEO     = ["06:00", "12:00", "20:00"]
 
 TELEGRAM_TOKEN   = _os.environ.get("TELEGRAM_TOKEN",   _FALLBACK_TOKEN)
 TELEGRAM_CHAT_ID = _os.environ.get("TELEGRAM_CHAT_ID", _FALLBACK_CHAT_ID)
@@ -182,19 +180,5 @@ def chequear() -> None:
 if __name__ == "__main__":
     print("=" * 50)
     print("  BOE Monitor — Subastas Inmuebles")
-    print(f"  Horarios (UTC): {', '.join(HORAS_CHEQUEO)}")
     print("=" * 50)
-
-    # Chequeo inmediato al arrancar (popula estado.json si está vacío)
     chequear()
-
-    for hora in HORAS_CHEQUEO:
-        schedule.every().day.at(hora).do(chequear)
-
-    print(f"\nPróximas ejecuciones programadas:")
-    for job in schedule.jobs:
-        print(f"  → {job}")
-
-    while True:
-        schedule.run_pending()
-        time.sleep(30)
