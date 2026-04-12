@@ -167,15 +167,22 @@ def chequear() -> None:
 
     es_primera_vez = not estado_anterior  # True si no había estado previo
 
-    if cambios:
-        msg = (
-            "⚠️ <b>BOE Subastas — Cambios detectados</b>\n\n"
-            + "\n".join(cambios)
-            + "\n\n🔗 <a href='https://subastas.boe.es'>Ver portal de subastas</a>"
-        )
-        enviar_telegram(msg)
-    elif es_primera_vez:
-        # Primera ejecución: confirmar que el bot funciona
+    nuevas = []     # Subastas que han subido (nuevas publicaciones)
+    cierres = []    # Subastas que han bajado (cierres normales)
+
+    for codigo, nombre in ESTADOS.items():
+        num = estado_nuevo.get(codigo)
+        anterior = estado_anterior.get(codigo)
+        if num is None or anterior is None:
+            continue
+        if num > anterior:
+            diff = num - anterior
+            nuevas.append(f"🆕 <b>{nombre}</b>: +{diff} nuevas ({anterior} → {num})")
+        elif num < anterior:
+            diff = anterior - num
+            cierres.append(f"📋 <b>{nombre}</b>: -{diff} finalizadas ({anterior} → {num})")
+
+    if es_primera_vez:
         resumen = "\n".join(
             f"🏠 <b>{nombre}</b>: {estado_nuevo.get(codigo, '?')} subastas"
             for codigo, nombre in ESTADOS.items()
@@ -184,12 +191,35 @@ def chequear() -> None:
             "✅ <b>BOE Monitor activado</b>\n\n"
             "Estado actual de subastas de Inmuebles:\n"
             + resumen
-            + "\n\n🔔 Te avisaré cuando cambie el número.\n"
+            + "\n\n🔔 Te avisaré solo cuando se publiquen nuevas subastas.\n"
             "🔗 <a href='https://subastas.boe.es'>Portal de subastas</a>"
         )
-        enviar_telegram(msg)
+    elif nuevas:
+        cuerpo = "\n".join(nuevas)
+        if cierres:
+            cuerpo += "\n\n" + "\n".join(cierres)
+        msg = (
+            "⚠️ <b>BOE — Nuevas subastas publicadas</b>\n\n"
+            + cuerpo
+            + "\n\n🔗 <a href='https://subastas.boe.es'>Ver portal de subastas</a>"
+        )
     else:
-        print("[OK] Sin cambios. Sin notificación.")
+        # Sin nuevas subastas — mensaje informativo tranquilizador
+        resumen = "\n".join(
+            f"🏠 <b>{nombre}</b>: {estado_nuevo.get(codigo, '?')} subastas"
+            for codigo, nombre in ESTADOS.items()
+        )
+        extra = ("\n📉 " + " / ".join(cierres)) if cierres else ""
+        msg = (
+            "✅ <b>BOE — Sin novedades</b>\n\n"
+            + resumen
+            + extra
+            + "\n\n🔕 No se han publicado subastas nuevas.\n"
+            "🔗 <a href='https://subastas.boe.es'>Portal de subastas</a>"
+        )
+
+    enviar_telegram(msg)
+
 
 
 # ── Arranque ────────────────────────────────────────────────────────────────
