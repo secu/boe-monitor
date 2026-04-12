@@ -1,9 +1,6 @@
 # Configuración de Telegram (¡NO subas este fichero a GitHub si contiene datos reales!)
 config.py
 
-# Estado persistido localmente
-estado.json
-
 # Python
 __pycache__/
 *.pyc
