@@ -165,11 +165,27 @@ def chequear() -> None:
 
     guardar_estado(estado_nuevo)
 
+    es_primera_vez = not estado_anterior  # True si no había estado previo
+
     if cambios:
         msg = (
             "⚠️ <b>BOE Subastas — Cambios detectados</b>\n\n"
             + "\n".join(cambios)
             + "\n\n🔗 <a href='https://subastas.boe.es'>Ver portal de subastas</a>"
+        )
+        enviar_telegram(msg)
+    elif es_primera_vez:
+        # Primera ejecución: confirmar que el bot funciona
+        resumen = "\n".join(
+            f"🏠 <b>{nombre}</b>: {estado_nuevo.get(codigo, '?')} subastas"
+            for codigo, nombre in ESTADOS.items()
+        )
+        msg = (
+            "✅ <b>BOE Monitor activado</b>\n\n"
+            "Estado actual de subastas de Inmuebles:\n"
+            + resumen
+            + "\n\n🔔 Te avisaré cuando cambie el número.\n"
+            "🔗 <a href='https://subastas.boe.es'>Portal de subastas</a>"
         )
         enviar_telegram(msg)
     else:
