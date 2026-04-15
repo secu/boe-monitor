@@ -267,12 +267,27 @@ def upsert_auctions(auctions: list[dict]) -> int:
     if not auctions:
         return 0
     
-    # Limpiar None values y preparar para Supabase
+    ALL_KEYS = [
+        "codigo_subasta", "tipo_subasta", "cuenta_expediente", "estado", 
+        "anuncio_boe", "forma_adjudicacion", "valor_subasta", "valor_tasacion", 
+        "cantidad_reclamada", "puja_minima", "tramos_entre_pujas", "importe_deposito", 
+        "fecha_inicio", "fecha_fin", "link_boe", "tipo_bien_raw", "tipo_bien", 
+        "descripcion", "referencia_catastral", "direccion", "codigo_postal", 
+        "localidad", "provincia", "situacion_posesoria", "visitable", "cargas", 
+        "inscripcion_registral", "informacion_adicional", "vivienda_habitual", 
+        "idufir", "superficie", "cuota"
+    ]
+    
+    # Asegurar que todas las subastas tienen exactamente las mismas keys
     clean = []
     for a in auctions:
-        row = {k: v for k, v in a.items() if v is not None and v != ""}
-        if "codigo_subasta" in row:
-            clean.append(row)
+        if not a.get("codigo_subasta"):
+            continue
+        row = {}
+        for key in ALL_KEYS:
+            val = a.get(key)
+            row[key] = val if val != "" else None
+        clean.append(row)
     
     if not clean:
         return 0
