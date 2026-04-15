@@ -19,7 +19,7 @@ import requests
 from bs4 import BeautifulSoup
 
 # ── Config ──────────────────────────────────────────────────────────────────
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://cpkafdlzqcuonpdolkwa.supabase.co")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://grjbvzrscxljxzjoqyky.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 GEOAPIFY_KEY = os.environ.get("GEOAPIFY_KEY", "2d45d6de85a14f309a64704120ff4835")
 
