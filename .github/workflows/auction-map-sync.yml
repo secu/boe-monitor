@@ -1,0 +1,33 @@
+name: InvestorMAP — Sync Subastas al Mapa
+
+on:
+  schedule:
+    # Ejecutar 1x al día a las 07:00 CEST (05:00 UTC)
+    # El scraping completo tarda más, así que 1x/día es suficiente
+    - cron: '0 5 * * *'
+  workflow_dispatch:  # Permite lanzarlo manualmente
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45  # El scraping puede tardar
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: |
+          pip install requests beautifulsoup4
+
+      - name: Ejecutar sync de subastas
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GEOAPIFY_KEY: ${{ secrets.GEOAPIFY_KEY }}
+        run: python sync_to_supabase.py
