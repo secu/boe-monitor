@@ -192,7 +192,8 @@ def chequear() -> None:
             "Estado actual de subastas de Inmuebles:\n"
             + resumen
             + "\n\n🔔 Te avisaré solo cuando se publiquen nuevas subastas.\n"
-            "🔗 <a href='https://subastas.boe.es'>Portal de subastas</a>"
+            "🔗 <a href='https://subastas.boe.es'>Portal de subastas BOE</a>  |  "
+            "🏠 <a href='https://app.investormap.es'>Suite InvestorMAP</a>"
         )
     elif nuevas:
         cuerpo = "\n".join(nuevas)
@@ -201,7 +202,8 @@ def chequear() -> None:
         msg = (
             "⚠️ <b>BOE — Nuevas subastas publicadas</b>\n\n"
             + cuerpo
-            + "\n\n🔗 <a href='https://subastas.boe.es'>Ver portal de subastas</a>"
+            + "\n\n🔗 <a href='https://subastas.boe.es'>Ver portal BOE</a>  |  "
+            "🏠 <a href='https://app.investormap.es'>Suite InvestorMAP</a>"
         )
     else:
         # Sin nuevas subastas — mensaje informativo tranquilizador
@@ -215,7 +217,8 @@ def chequear() -> None:
             + resumen
             + extra
             + "\n\n🔕 No se han publicado subastas nuevas.\n"
-            "🔗 <a href='https://subastas.boe.es'>Portal de subastas</a>"
+            "🔗 <a href='https://subastas.boe.es'>Portal BOE</a>  |  "
+            "🏠 <a href='https://app.investormap.es'>Suite InvestorMAP</a>"
         )
 
     enviar_telegram(msg)
