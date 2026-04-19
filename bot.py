@@ -37,6 +37,18 @@ ESTADOS = {
     "EJ": "Celebrándose",
 }
 
+# URLs directas al portal BOE con el filtro de estado ya aplicado
+URL_BASE_FILTRO = (
+    "https://subastas.boe.es/subastas_ava.php"
+    "?accion=Buscar"
+    "&campo[2]=SUBASTA.ESTADO.CODIGO&dato[2]={codigo}"
+    "&campo[3]=BIEN.TIPO&dato[3]=I"
+)
+URLS_ESTADO = {
+    codigo: URL_BASE_FILTRO.format(codigo=codigo)
+    for codigo in ["PU", "EJ"]
+}
+
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -175,16 +187,17 @@ def chequear() -> None:
         anterior = estado_anterior.get(codigo)
         if num is None or anterior is None:
             continue
+        url = URLS_ESTADO[codigo]
         if num > anterior:
             diff = num - anterior
-            nuevas.append(f"🆕 <b>{nombre}</b>: +{diff} nuevas ({anterior} → {num})")
+            nuevas.append(f"🆕 <a href='{url}'><b>{nombre}</b>: +{diff} nuevas ({anterior} → {num})</a>")
         elif num < anterior:
             diff = anterior - num
-            cierres.append(f"📋 <b>{nombre}</b>: -{diff} finalizadas ({anterior} → {num})")
+            cierres.append(f"📋 <a href='{url}'><b>{nombre}</b>: -{diff} finalizadas ({anterior} → {num})</a>")
 
     if es_primera_vez:
         resumen = "\n".join(
-            f"🏠 <b>{nombre}</b>: {estado_nuevo.get(codigo, '?')} subastas"
+            f"🏠 <a href='{URLS_ESTADO[codigo]}'><b>{nombre}</b>: {estado_nuevo.get(codigo, '?')} subastas</a>"
             for codigo, nombre in ESTADOS.items()
         )
         msg = (
@@ -210,7 +223,7 @@ def chequear() -> None:
     else:
         # Sin nuevas subastas — mensaje informativo tranquilizador
         resumen = "\n".join(
-            f"🏠 <b>{nombre}</b>: {estado_nuevo.get(codigo, '?')} subastas"
+            f"🏠 <a href='{URLS_ESTADO[codigo]}'><b>{nombre}</b>: {estado_nuevo.get(codigo, '?')} subastas</a>"
             for codigo, nombre in ESTADOS.items()
         )
         extra = ("\n📉 " + " / ".join(cierres)) if cierres else ""
