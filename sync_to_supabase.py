@@ -391,9 +391,9 @@ def geocode_pending() -> int:
             f"{SUPABASE_URL}/rest/v1/map_auctions",
             headers=SUPABASE_HEADERS,
             params={
-                "select": "id,direccion,codigo_postal,localidad,provincia",
+                "select": "id,direccion,codigo_postal,localidad,provincia,created_at",
                 "lat": "is.null",
-                "order": "created_at.asc",
+                "order": "created_at.desc",
                 "limit": str(GEOCODE_BATCH),
             },
             timeout=20,
