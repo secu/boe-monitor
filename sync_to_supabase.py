@@ -43,7 +43,7 @@ SUPABASE_HEADERS = {
 }
 
 MAX_AUCTIONS = 500  # Límite para no sobrecargar en una sola ejecución
-GEOCODE_BATCH = 50  # Máximo de geocodificaciones por ejecución
+GEOCODE_BATCH = 200  # Máximo de geocodificaciones por ejecución
 
 
 # ── Clasificador de tipo de bien ────────────────────────────────────────────
@@ -218,26 +218,38 @@ def fetch_auction_detail(url: str) -> dict | None:
     return item
 
 
-# ── Geocodificación con Geoapify ────────────────────────────────────────────
-def geocode_auction(auction: dict) -> tuple[float | None, float | None]:
-    """Geocodifica una subasta usando Geoapify. Retorna (lat, lng) o (None, None)."""
-    # Construir query con la mejor info disponible
-    parts = []
+# ── Geocodificación con Geoapify + fallback Nominatim ─────────────────────
+def build_geocode_queries(auction: dict) -> tuple[str | None, str | None]:
+    """Construye query exacta y query aproximada para geocodificación."""
+    parts_exact = []
     if auction.get("direccion"):
-        parts.append(auction["direccion"])
+        parts_exact.append(auction["direccion"])
     if auction.get("codigo_postal"):
-        parts.append(auction["codigo_postal"])
+        parts_exact.append(auction["codigo_postal"])
     if auction.get("localidad"):
-        parts.append(auction["localidad"])
+        parts_exact.append(auction["localidad"])
     if auction.get("provincia"):
-        parts.append(auction["provincia"])
-    parts.append("España")
-    
-    query = ", ".join(p for p in parts if p)
-    
-    if not query or query == "España":
+        parts_exact.append(auction["provincia"])
+    parts_exact.append("España")
+
+    parts_aprox = []
+    if auction.get("localidad"):
+        parts_aprox.append(auction["localidad"])
+    elif auction.get("provincia"):
+        parts_aprox.append(auction["provincia"])
+    if auction.get("provincia") and auction.get("localidad"):
+        parts_aprox.append(auction["provincia"])
+    parts_aprox.append("España")
+
+    q_exact = ", ".join(p for p in parts_exact if p) if len(parts_exact) > 1 else None
+    q_aprox = ", ".join(p for p in parts_aprox if p) if len(parts_aprox) > 1 else None
+    return q_exact, q_aprox
+
+
+def geocode_geoapify(query: str) -> tuple[float | None, float | None]:
+    """Geocodifica con Geoapify. Retorna (lat, lng) o (None, None)."""
+    if not query or not GEOAPIFY_KEY:
         return None, None
-    
     try:
         resp = requests.get(
             "https://api.geoapify.com/v1/geocode/search",
@@ -247,18 +259,70 @@ def geocode_auction(auction: dict) -> tuple[float | None, float | None]:
                 "limit": 1,
                 "apiKey": GEOAPIFY_KEY,
             },
-            timeout=10,
+            timeout=8,
         )
         resp.raise_for_status()
         data = resp.json()
-        
         if data.get("features"):
             coords = data["features"][0]["geometry"]["coordinates"]
             return coords[1], coords[0]  # [lng, lat] → (lat, lng)
     except Exception as e:
-        print(f"  [GEOCODE ERROR] {query}: {e}")
-    
+        print(f"  [GEOAPIFY ERROR] {query[:60]}: {e}")
     return None, None
+
+
+def geocode_nominatim(query: str) -> tuple[float | None, float | None]:
+    """Geocodifica con Nominatim (fallback gratuito). Retorna (lat, lng) o (None, None)."""
+    if not query:
+        return None, None
+    try:
+        resp = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"format": "json", "q": query, "limit": 1, "countrycodes": "es"},
+            headers={"User-Agent": "InvestorMAP_Sync_Bot/2.0 (geocoding pipeline)"},
+            timeout=8,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if data:
+            return float(data[0]["lat"]), float(data[0]["lon"])
+    except Exception as e:
+        print(f"  [NOMINATIM ERROR] {query[:60]}: {e}")
+    return None, None
+
+
+def geocode_auction(auction: dict) -> tuple[float | None, float | None, str]:
+    """Geocodifica una subasta con Geoapify primero, Nominatim como fallback.
+    Retorna (lat, lng, source) donde source es 'geoapify', 'nominatim' o 'failed'."""
+    q_exact, q_aprox = build_geocode_queries(auction)
+
+    # 1. Intentar Geoapify con query exacta (incluye dirección)
+    if q_exact and auction.get("direccion"):
+        lat, lng = geocode_geoapify(q_exact)
+        if lat and lng:
+            return lat, lng, "geoapify"
+
+    # 2. Intentar Geoapify con query aproximada (localidad + provincia)
+    if q_aprox:
+        lat, lng = geocode_geoapify(q_aprox)
+        if lat and lng:
+            return lat, lng, "geoapify_aprox"
+
+    # 3. Fallback Nominatim con query exacta
+    if q_exact and auction.get("direccion"):
+        time.sleep(0.5)  # Respetar rate limit Nominatim entre llamadas
+        lat, lng = geocode_nominatim(q_exact)
+        if lat and lng:
+            return lat, lng, "nominatim"
+
+    # 4. Fallback Nominatim con query aproximada
+    if q_aprox:
+        time.sleep(0.5)
+        lat, lng = geocode_nominatim(q_aprox)
+        if lat and lng:
+            return lat, lng, "nominatim_aprox"
+
+    return None, None, "failed"
 
 
 # ── Upsert a Supabase ──────────────────────────────────────────────────────
@@ -320,8 +384,8 @@ def upsert_auctions(auctions: list[dict]) -> int:
 
 
 def geocode_pending() -> int:
-    """Geocodifica subastas que aún no tienen coordenadas."""
-    # Obtener subastas sin geocodificar
+    """Geocodifica subastas que aún no tienen coordenadas (Geoapify + Nominatim fallback)."""
+    # IMPORTANTE: El filtro lat=is.null debe ir en el query string de Supabase REST
     try:
         resp = requests.get(
             f"{SUPABASE_URL}/rest/v1/map_auctions",
@@ -329,45 +393,65 @@ def geocode_pending() -> int:
             params={
                 "select": "id,direccion,codigo_postal,localidad,provincia",
                 "lat": "is.null",
+                "order": "created_at.asc",
                 "limit": str(GEOCODE_BATCH),
             },
-            timeout=15,
+            timeout=20,
         )
         resp.raise_for_status()
         pending = resp.json()
     except Exception as e:
         print(f"[ERROR] Fetching pending geocodes: {e}")
         return 0
-    
+
     if not pending:
         print("[OK] No hay subastas pendientes de geocodificar")
         return 0
-    
-    print(f"[GEOCODE] {len(pending)} subastas pendientes de geocodificar")
+
+    print(f"[GEOCODE] {len(pending)} subastas pendientes de geocodificar (Geoapify + Nominatim fallback)")
     geocoded = 0
-    
-    for auction in pending:
-        lat, lng = geocode_auction(auction)
+    failed = 0
+    sources = {}
+
+    for i, auction in enumerate(pending):
+        lat, lng, source = geocode_auction(auction)
+        sources[source] = sources.get(source, 0) + 1
+
         if lat and lng:
             try:
-                resp = requests.patch(
+                patch_resp = requests.patch(
                     f"{SUPABASE_URL}/rest/v1/map_auctions?id=eq.{auction['id']}",
-                    headers=SUPABASE_HEADERS,
+                    headers={
+                        **SUPABASE_HEADERS,
+                        "Prefer": "return=minimal",
+                    },
                     json={
                         "lat": lat,
                         "lng": lng,
                         "geocoded_at": "now()",
-                        "geocode_source": "geoapify",
+                        "geocode_source": source,
                     },
                     timeout=10,
                 )
-                if resp.status_code in (200, 204):
+                if patch_resp.status_code in (200, 204):
                     geocoded += 1
-            except Exception:
-                pass
-        
-        time.sleep(0.35)  # Respetar rate limit Geoapify (3 req/s)
-    
+                    if geocoded % 20 == 0:
+                        print(f"  → {geocoded}/{len(pending)} geocodificadas... (fuentes: {sources})")
+                else:
+                    print(f"  [PATCH ERROR] {auction['id']}: {patch_resp.status_code}")
+            except Exception as e:
+                print(f"  [PATCH EXCEPTION] {auction['id']}: {e}")
+        else:
+            failed += 1
+            if failed <= 5:  # Solo loguear los primeros 5 fallos
+                loc = auction.get('localidad') or auction.get('provincia') or 'Sin ubicación'
+                print(f"  [FAIL] Sin coordenadas: {loc}")
+
+        # Rate limiting: Geoapify permite ~3 req/s en plan gratuito
+        # Con Nominatim como fallback necesitamos ser más conservadores
+        time.sleep(0.4)
+
+    print(f"[GEOCODE] Completado: {geocoded} geocodificadas, {failed} fallidas | Fuentes: {sources}")
     return geocoded
 
 

@@ -2,9 +2,10 @@ name: InvestorMAP — Sync Subastas al Mapa
 
 on:
   schedule:
-    # Ejecutar 1x al día a las 07:00 CEST (05:00 UTC)
-    # El scraping completo tarda más, así que 1x/día es suficiente
+    # Ejecutar 2x al día: 07:00 CEST y 14:00 CEST (05:00 y 12:00 UTC)
+    # Con GEOCODE_BATCH=200, esto procesa hasta 400 subastas/día
     - cron: '0 5 * * *'
+    - cron: '0 12 * * *'
   workflow_dispatch:  # Permite lanzarlo manualmente
 
 jobs:
