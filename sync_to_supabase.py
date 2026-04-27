@@ -94,6 +94,21 @@ def fetch_auction_list(estado_codigo: str) -> list[str]:
     all_urls = []
     page = 0
 
+    # ── Crear sesión con cookies ─────────────────────────────────────────────
+    # El BOE requiere establecer la sesión (cookie) antes de aceptar el POST.
+    # Sin el GET previo, devuelve "La página que solicita no puede ser mostrada".
+    session = requests.Session()
+    try:
+        session.get(
+            "https://subastas.boe.es/subastas_ava.php",
+            headers=HEADERS,
+            timeout=20,
+        )
+        time.sleep(1)  # pequeña pausa antes del POST
+    except requests.RequestException as e:
+        print(f"  [WARN] No se pudo establecer sesión BOE: {e}")
+    # ─────────────────────────────────────────────────────────────────────────
+
     while True:
         form_data = {
             "accion": "Buscar",
@@ -114,7 +129,7 @@ def fetch_auction_list(estado_codigo: str) -> list[str]:
         }
 
         try:
-            resp = requests.post(
+            resp = session.post(
                 "https://subastas.boe.es/subastas_ava.php",
                 data=form_data,
                 headers=HEADERS,
