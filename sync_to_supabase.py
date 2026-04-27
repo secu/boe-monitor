@@ -35,6 +35,12 @@ HEADERS = {
         "Chrome/124.0.0.0 Safari/537.36"
     ),
     "Referer": "https://subastas.boe.es/subastas_ava.php",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Cache-Control": "max-age=0",
 }
 
 MAX_AUCTIONS  = 2000
@@ -89,49 +95,36 @@ def get_value(soup, keyword: str) -> str:
 
 
 # ── Scraping BOE ─────────────────────────────────────────────────────────────
+# URL base para búsqueda GET (igual al formato que usa bot.py para los enlaces directos)
+_BOE_SEARCH_BASE = (
+    "https://subastas.boe.es/subastas_ava.php"
+    "?accion=Buscar"
+    "&page_hits=500"
+    "&campo[0]=SUBASTA.ORIGEN&dato[0]="
+    "&campo[1]=SUBASTA.AUTORIDAD&dato[1]="
+    "&campo[2]=SUBASTA.ESTADO.CODIGO&dato[2]={estado}"
+    "&campo[3]=BIEN.TIPO&dato[3]=I"
+    "&campo[4]=BIEN.SUBTIPO&dato[4]="
+    "&sort_field[0]=SUBASTA.FECHA_FIN&sort_order[0]=asc"
+    "&pagina={pagina}"
+)
+
+
 def fetch_auction_list(estado_codigo: str) -> list[str]:
-    """Obtiene la lista de URLs de subastas para un estado dado."""
+    """Obtiene la lista de URLs de subastas para un estado dado (via GET)."""
     all_urls = []
     page = 0
 
-    # ── Crear sesión con cookies ─────────────────────────────────────────────
-    # El BOE requiere establecer la sesión (cookie) antes de aceptar el POST.
-    # Sin el GET previo, devuelve "La página que solicita no puede ser mostrada".
+    # Usamos GET con parámetros en la URL — igual que los enlaces directos de bot.py.
+    # Esto evita los problemas de sesión/CSRF que afectan al POST.
     session = requests.Session()
-    try:
-        session.get(
-            "https://subastas.boe.es/subastas_ava.php",
-            headers=HEADERS,
-            timeout=20,
-        )
-        time.sleep(1)  # pequeña pausa antes del POST
-    except requests.RequestException as e:
-        print(f"  [WARN] No se pudo establecer sesión BOE: {e}")
-    # ─────────────────────────────────────────────────────────────────────────
 
     while True:
-        form_data = {
-            "accion": "Buscar",
-            "page_hits": "500",
-            "campo[0]": "SUBASTA.ORIGEN",
-            "dato[0]": "",
-            "campo[1]": "SUBASTA.AUTORIDAD",
-            "dato[1]": "",
-            "campo[2]": "SUBASTA.ESTADO.CODIGO",
-            "dato[2]": estado_codigo,
-            "campo[3]": "BIEN.TIPO",
-            "dato[3]": "I",
-            "campo[4]": "BIEN.SUBTIPO",
-            "dato[4]": "",
-            "sort_field[0]": "SUBASTA.FECHA_FIN",
-            "sort_order[0]": "asc",
-            "pagina": str(page + 1),
-        }
+        url = _BOE_SEARCH_BASE.format(estado=estado_codigo, pagina=page + 1)
 
         try:
-            resp = session.post(
-                "https://subastas.boe.es/subastas_ava.php",
-                data=form_data,
+            resp = session.get(
+                url,
                 headers=HEADERS,
                 timeout=30,
             )
@@ -147,13 +140,13 @@ def fetch_auction_list(estado_codigo: str) -> list[str]:
         ))
 
         if not urls:
-            # Debug: mostrar qué devuelve el BOE para detectar bloqueos o cambios de HTML
+            # Debug: mostrar qué devuelve el BOE
             title = soup.title.string if soup.title else "Sin título"
             h1 = soup.find("h1")
             h1_text = h1.get_text(strip=True) if h1 else "Sin h1"
             print(f"  [DEBUG] BOE devolvió 0 links. HTTP {resp.status_code} | "
                   f"Título: '{title}' | H1: '{h1_text}' | "
-                  f"Bytes recibidos: {len(resp.content)}")
+                  f"Bytes: {len(resp.content)}")
             break
 
         all_urls.extend(urls)
@@ -164,7 +157,7 @@ def fetch_auction_list(estado_codigo: str) -> list[str]:
             break
 
         page += 1
-        time.sleep(1)
+        time.sleep(1.5)
 
     return list(set(all_urls))[:MAX_AUCTIONS]
 
