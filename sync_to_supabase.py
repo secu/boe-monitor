@@ -132,6 +132,13 @@ def fetch_auction_list(estado_codigo: str) -> list[str]:
         ))
 
         if not urls:
+            # Debug: mostrar qué devuelve el BOE para detectar bloqueos o cambios de HTML
+            title = soup.title.string if soup.title else "Sin título"
+            h1 = soup.find("h1")
+            h1_text = h1.get_text(strip=True) if h1 else "Sin h1"
+            print(f"  [DEBUG] BOE devolvió 0 links. HTTP {resp.status_code} | "
+                  f"Título: '{title}' | H1: '{h1_text}' | "
+                  f"Bytes recibidos: {len(resp.content)}")
             break
 
         all_urls.extend(urls)
