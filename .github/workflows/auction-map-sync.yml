@@ -2,16 +2,19 @@ name: InvestorMAP — Sync Subastas al Mapa
 
 on:
   schedule:
-    # Ejecutar 2x al día: 07:00 CEST y 14:00 CEST (05:00 y 12:00 UTC)
-    # Con GEOCODE_BATCH=200, esto procesa hasta 400 subastas/día
+    # Modo ACTIVAS (Celebrándose): cada día a las 07:00 CEST (05:00 UTC)
     - cron: '0 5 * * *'
-    - cron: '0 12 * * *'
-  workflow_dispatch:  # Permite lanzarlo manualmente
+    # Modo PRÓXIMAS (Próxima apertura): cada día a las 21:00 CEST (19:00 UTC)
+    - cron: '0 19 * * *'
+  workflow_dispatch:  # Permite lanzarlo manualmente (sin modo = ambas)
 
 jobs:
-  sync:
+  sync-activas:
+    name: Sync Activas (07:00 CEST)
     runs-on: ubuntu-latest
-    timeout-minutes: 45  # El scraping puede tardar
+    timeout-minutes: 45
+    # Solo corre en el cron de las 05:00 UTC o si se lanza manualmente
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 5 * * *'
 
     steps:
       - name: Checkout repositorio
@@ -23,12 +26,37 @@ jobs:
           python-version: '3.11'
 
       - name: Instalar dependencias
-        run: |
-          pip install requests beautifulsoup4
+        run: pip install requests beautifulsoup4
 
-      - name: Ejecutar sync de subastas
+      - name: Ejecutar sync (modo activas)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           GEOAPIFY_KEY: ${{ secrets.GEOAPIFY_KEY }}
-        run: python sync_to_supabase.py
+        run: python sync_to_supabase.py --mode activas
+
+  sync-proximas:
+    name: Sync Próximas (21:00 CEST)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Solo corre en el cron de las 19:00 UTC
+    if: github.event.schedule == '0 19 * * *'
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install requests beautifulsoup4
+
+      - name: Ejecutar sync (modo próximas)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GEOAPIFY_KEY: ${{ secrets.GEOAPIFY_KEY }}
+        run: python sync_to_supabase.py --mode proximas
