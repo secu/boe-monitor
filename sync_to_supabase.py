@@ -391,6 +391,16 @@ def archive_concluded(active_codes_in_boe: set[str], mode: str) -> int:
     # Determinar qué código BOE gestiona este modo
     boe_codigo = "EJ" if mode == "activas" else "PU"
 
+    # ── SAFEGUARD ────────────────────────────────────────────────────────────
+    # Si el scraper devolvió 0 URLs, es casi seguro un fallo de red/bloqueo
+    # del BOE, NO que todas las subastas hayan concluido. Saltamos el archivado
+    # para evitar marcar falsamente como 'Concluida' subastas que siguen activas.
+    if len(active_codes_in_boe) == 0:
+        print(f"[ARCHIVO] ⚠️  0 subastas {boe_codigo} encontradas en BOE — "
+              f"saltando archivado (posible fallo de scraping).")
+        return 0
+    # ─────────────────────────────────────────────────────────────────────────
+
     try:
         # Obtener todas las que están en DB con este boe_estado_codigo y no Concluida
         resp = requests.get(
