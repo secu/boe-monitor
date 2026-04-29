@@ -98,15 +98,15 @@ def get_numero_subastas(estado_codigo: str) -> int | None:
     soup = BeautifulSoup(resp.text, "html.parser")
     texto = soup.get_text(separator=" ")
 
-    # El portal muestra: "Resultados 1 a 50 de 162"
-    match = re.search(r"Resultados\s+\d+\s+a\s+\d+\s+de\s+(\d+)", texto, re.IGNORECASE)
+    # El portal muestra: "Resultados 1 a 50 de 162" o "1.058"
+    match = re.search(r"Resultados\s+[\d\.]+\s+a\s+[\d\.]+\s+de\s+([\d\.]+)", texto, re.IGNORECASE)
     if match:
-        return int(match.group(1))
+        return int(match.group(1).replace(".", ""))
 
     # Fallback: cualquier patrón "de X" cerca de "Resultado"
-    match2 = re.search(r"de\s+(\d+)", texto, re.IGNORECASE)
+    match2 = re.search(r"de\s+([\d\.]+)", texto, re.IGNORECASE)
     if match2:
-        return int(match2.group(1))
+        return int(match2.group(1).replace(".", ""))
 
     print(f"[AVISO] No se pudo extraer el número de subastas para estado {estado_codigo}")
     return None
