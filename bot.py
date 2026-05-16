@@ -98,18 +98,25 @@ def get_numero_subastas(estado_codigo: str) -> int | None:
     soup = BeautifulSoup(resp.text, "html.parser")
     texto = soup.get_text(separator=" ")
 
+    # Si el portal dice explícitamente que no hay resultados
+    if re.search(r"No se han encontrado resultados", texto, re.IGNORECASE) or re.search(r"Cero resultados", texto, re.IGNORECASE):
+        return 0
+
     # El portal muestra: "Resultados 1 a 50 de 162" o "1.058"
     match = re.search(r"Resultados\s+[\d\.]+\s+a\s+[\d\.]+\s+de\s+([\d\.]+)", texto, re.IGNORECASE)
     if match:
         return int(match.group(1).replace(".", ""))
 
-    # Fallback: cualquier patrón "de X" cerca de "Resultado"
-    match2 = re.search(r"de\s+([\d\.]+)", texto, re.IGNORECASE)
+    # Fallback más seguro que evita capturar años de fechas (ej: "de 2026")
+    # Buscamos "de X" pero que esté cerca de la palabra "Resultado"
+    match2 = re.search(r"Resultados?[^\d]{0,20}de\s+([\d\.]{1,6})(?!\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))", texto, re.IGNORECASE)
     if match2:
         return int(match2.group(1).replace(".", ""))
 
-    print(f"[AVISO] No se pudo extraer el número de subastas para estado {estado_codigo}")
-    return None
+    print(f"[AVISO] No se pudo extraer el número de subastas para estado {estado_codigo}. Texto extraído: {texto[:100]}...")
+    # Si realmente no podemos parsear, retornamos 0 asumiendo que no hay resultados en lugar de fallar
+    # Solo retornamos None si la petición HTTP falló (manejado arriba)
+    return 0
 
 
 # ── Persistencia de estado ──────────────────────────────────────────────────
