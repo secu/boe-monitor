@@ -1,23 +1,4 @@
 {
-  "PU": 390,
-  "EJ": 732,
-  "alerta_ts": 1783453269,
-  "oport": [
-    {
-      "t": "VIVIENDAS",
-      "n": 97,
-      "p": 50000
-    },
-    {
-      "t": "FINCAS",
-      "n": 50,
-      "p": 15000
-    },
-    {
-      "t": "GARAJES",
-      "n": 28,
-      "p": 3000
-    }
-  ],
-  "alerta_msg": "Nuevas Subastas Activas"
+  "PU": 104,
+  "EJ": 1017
 }
