@@ -1,4 +1,23 @@
 {
   "PU": 167,
-  "EJ": 322
+  "EJ": 322,
+  "alerta_ts": 1788279550,
+  "oport": [
+    {
+      "t": "VIVIENDAS",
+      "n": 13,
+      "p": 50000
+    },
+    {
+      "t": "FINCAS",
+      "n": 29,
+      "p": 15000
+    },
+    {
+      "t": "GARAJES",
+      "n": 4,
+      "p": 3000
+    }
+  ],
+  "alerta_msg": "Nuevas Subastas Activas"
 }
